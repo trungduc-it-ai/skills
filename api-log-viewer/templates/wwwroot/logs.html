@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>%%SERVICE_TITLE%% - Tra cứu log</title>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --panel: #ffffff;
+    --border: #d7dce2;
+    --text: #1f2a33;
+    --muted: #65727c;
+    --accent: #0b6fb8;
+    --accent-dark: #084f85;
+    --error: #b3261e;
+    --error-bg: #fdecea;
+    --warn: #a15c00;
+    --warn-bg: #fff4e0;
+    --success: #1f8a4c;
+    --success-bg: #e6f4ea;
+    --info: #4a5a66;
+    --info-bg: #eef1f4;
+    --calls: #6b4fbb;
+    --code-bg: #f7f9fb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    background: var(--accent-dark);
+    color: #fff;
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    gap: 0 24px;
+    flex-wrap: wrap;
+  }
+  header .title { font-size: 18px; font-weight: 600; padding: 14px 0; }
+  .tabs { display: flex; gap: 4px; }
+  .tab {
+    background: transparent;
+    color: #cfe3f3;
+    border-radius: 0;
+    padding: 16px 14px 13px;
+    border-bottom: 3px solid transparent;
+    font-weight: 600;
+  }
+  .tab:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .tab.active { color: #fff; border-bottom-color: #fff; }
+  main {
+    padding: 16px 20px 40px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .panel h2 {
+    margin: 0 0 12px;
+    font-size: 15px;
+  }
+  .panel .hint-text { font-size: 12.5px; color: var(--muted); margin: -6px 0 12px; }
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-end;
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .field label {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .field select, .field input {
+    padding: 7px 8px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    font-size: 14px;
+    min-width: 150px;
+    background: #fff;
+    color: var(--text);
+  }
+  .field input[type="text"], .field input[type="password"] { min-width: 220px; }
+  .field input[type="number"] { min-width: 110px; width: 110px; }
+  .field label.check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13.5px;
+    font-weight: 400;
+    color: var(--text);
+    padding-bottom: 8px;
+  }
+  .field label.check input { min-width: 0; width: auto; padding: 0; margin: 0; }
+  button {
+    padding: 8px 18px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button:hover { background: var(--accent-dark); }
+  button:disabled { background: #9fb3bf; cursor: default; }
+  button.secondary { background: #fff; color: var(--accent); border: 1px solid var(--accent); }
+  button.secondary:hover { background: #eef5fb; }
+  button.danger { background: var(--error); }
+  button.danger:hover { background: #8c1d17; }
+  button.small { padding: 5px 12px; font-size: 12.5px; }
+  .status-line {
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .status-line.error { color: var(--error); }
+  .status-line.ok { color: var(--success); }
+  [hidden] { display: none !important; }
+
+  /* ---------- Danh sách kết quả ---------- */
+  #results-meta { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  #empty { color: var(--muted); font-style: italic; padding: 10px 0; }
+  .entry {
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    background: var(--panel);
+    cursor: pointer;
+    padding: 8px 12px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 12px;
+    align-items: center;
+  }
+  .entry:hover { background: #fafcfd; }
+  .entry.st-error { border-left-color: var(--error); }
+  .entry.st-warn { border-left-color: var(--warn); }
+  .entry.st-ok { border-left-color: var(--success); }
+  .entry.st-info, .entry.st-unknown { border-left-color: #9aa6ae; }
+  .entry .line1 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    min-width: 0;
+  }
+  .entry .ts { color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .entry .url { font-family: Consolas, "Courier New", monospace; font-size: 12.5px; word-break: break-all; }
+  .entry .meta { color: var(--muted); font-size: 12.5px; }
+  .entry .line2 {
+    grid-column: 1 / -1;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .entry .line2.err { color: var(--error); font-weight: 600; }
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 10px;
+    white-space: nowrap;
+  }
+  .badge.st-ok { background: var(--success-bg); color: var(--success); }
+  .badge.st-error { background: var(--error-bg); color: var(--error); }
+  .badge.st-warn { background: var(--warn-bg); color: var(--warn); }
+  .badge.st-info, .badge.st-unknown, .badge.st-skipped { background: var(--info-bg); color: var(--info); }
+  .badge.tag { background: #e8f1f9; color: var(--accent-dark); }
+  #pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin: 14px 0 30px;
+  }
+  #pagination button { padding: 6px 16px; font-size: 13px; }
+  #pagination .page-info { font-size: 13px; color: var(--muted); }
+  mark {
+    background: #fff3a3;
+    color: inherit;
+    padding: 0 1px;
+    border-radius: 2px;
+  }
+
+  /* ---------- Chi tiết ---------- */
+  #modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 28, 34, 0.55);
+    z-index: 100;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 24px 16px;
+    overflow-y: auto;
+  }
+  #modal-overlay.open { display: flex; }
+  #modal-box {
+    background: var(--panel);
+    border-radius: 8px;
+    max-width: 1050px;
+    width: 100%;
+    max-height: calc(100vh - 48px);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+  }
+  #modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  #modal-title { font-weight: 600; font-size: 14px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-width: 0; }
+  #modal-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+  #modal-close {
+    background: none;
+    color: var(--muted);
+    font-size: 22px;
+    padding: 0 6px;
+    line-height: 1;
+  }
+  #modal-close:hover { background: none; color: var(--error); }
+  #modal-content {
+    padding: 14px 16px;
+    overflow: auto;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 8px 16px;
+    margin-bottom: 14px;
+    padding: 10px 12px;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  .info-grid .k { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
+  .info-grid .v { font-family: Consolas, "Courier New", monospace; font-size: 12.5px; word-break: break-all; }
+  .section {
+    margin-bottom: 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .section-title {
+    padding: 6px 10px;
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    color: #fff;
+  }
+  .section-body { padding: 8px 10px; }
+  .section-request { border-color: var(--accent); }
+  .section-request > .section-title { background: var(--accent); }
+  .section-response { border-color: var(--success); }
+  .section-response > .section-title { background: var(--success); }
+  .section-other { border-color: var(--muted); }
+  .section-other > .section-title { background: var(--muted); }
+  .section-error { border-color: var(--error); }
+  .section-error > .section-title { background: var(--error); }
+  .section-steps { border-color: #2f6f7e; }
+  .section-steps > .section-title { background: #2f6f7e; }
+  .section-calls { border-color: var(--calls); }
+  .section-calls > .section-title { background: var(--calls); }
+  pre.code {
+    margin: 4px 0 0;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 8px 10px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 12.5px;
+    line-height: 1.45;
+    max-height: 420px;
+    overflow: auto;
+  }
+  pre.code.err { border-color: var(--error); color: var(--error); background: var(--error-bg); font-weight: 600; }
+  .j-key { color: #0b5394; }
+  .j-str { color: #1f7a3a; }
+  .j-num { color: #a14f00; }
+  .j-lit { color: #7b3fa0; }
+  .j-mask { color: #8a96a0; font-style: italic; }
+  .field-label {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-top: 8px;
+  }
+  .field-label:first-child { margin-top: 0; }
+  .field-label.err { color: var(--error); }
+  .field-row { padding: 8px 10px; border-top: 1px solid var(--border); }
+  .field-row:first-of-type { border-top: none; }
+  .field-text { white-space: pre-wrap; word-break: break-word; font-family: Consolas, "Courier New", monospace; font-size: 12.5px; }
+
+  /* Bước xử lý + biểu đồ thời gian */
+  .step { border-top: 1px solid var(--border); }
+  .step:first-child { border-top: none; }
+  .step-head {
+    display: grid;
+    grid-template-columns: 28px minmax(180px, 1.4fr) 70px 80px minmax(120px, 1fr);
+    gap: 10px;
+    align-items: center;
+    padding: 7px 10px;
+    cursor: pointer;
+    font-size: 12.5px;
+  }
+  .step-head:hover { background: #f6f9fb; }
+  .step-head .no {
+    width: 22px; height: 22px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #fff; background: var(--success);
+  }
+  .step.st-error .no { background: var(--error); }
+  .step.st-skipped .no { background: #9aa6ae; }
+  .step-head .name { font-weight: 600; }
+  .step-head .name .sub { font-weight: 400; color: var(--muted); }
+  .step-head .num { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .step-head .num.dur { color: var(--text); font-weight: 600; }
+  .bar-track { position: relative; height: 10px; background: #eef1f4; border-radius: 5px; }
+  .bar { position: absolute; top: 0; height: 10px; border-radius: 5px; background: var(--success); min-width: 2px; }
+  .step.st-error .bar { background: var(--error); }
+  .step.st-skipped .bar { background: #b8c1c8; }
+  .step-head .caret { color: var(--muted); }
+  .step-body { display: none; padding: 4px 10px 10px 48px; }
+  .step.open .step-body { display: block; }
+  .steps-legend {
+    display: grid;
+    grid-template-columns: 28px minmax(180px, 1.4fr) 70px 80px minmax(120px, 1fr);
+    gap: 10px;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    background: #fafbfc;
+  }
+  .steps-legend .num { text-align: right; }
+  .call-card {
+    border: 1px dashed var(--border);
+    border-left: 3px solid var(--calls);
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-top: 8px;
+  }
+  .call-card.has-error { border-left-color: var(--error); }
+  .call-title { font-weight: 700; font-size: 12px; color: var(--calls); word-break: break-all; }
+  .call-card.has-error .call-title { color: var(--error); }
+
+  /* ---------- Quản lý log ---------- */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .card { border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; background: var(--code-bg); }
+  .card .k { font-size: 11.5px; color: var(--muted); font-weight: 700; text-transform: uppercase; }
+  .card .v { font-size: 20px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  table.grid { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.grid th, table.grid td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left; }
+  table.grid th { font-size: 11.5px; color: var(--muted); text-transform: uppercase; }
+  table.grid td.num, table.grid th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .size-bar { height: 6px; background: var(--accent); border-radius: 3px; min-width: 2px; }
+  .radio-group { display: flex; flex-direction: column; gap: 10px; margin: 6px 0 12px; }
+  .radio-group label { display: flex; align-items: center; gap: 8px; font-size: 13.5px; flex-wrap: wrap; }
+  .radio-group input[type="number"], .radio-group input[type="date"] {
+    padding: 5px 7px; border: 1px solid var(--border); border-radius: 5px; font-size: 13.5px;
+  }
+  .radio-group input[type="number"] { width: 80px; }
+  .result-box { margin-top: 12px; font-size: 13px; }
+  .table-wrap { overflow-x: auto; }
+
+  @media (max-width: 720px) {
+    main { padding: 12px 16px 30px; }
+    .step-head, .steps-legend { grid-template-columns: 24px 1fr 60px 70px; }
+    .step-head .bar-track, .steps-legend .bar-col { display: none; }
+    .step-body { padding-left: 12px; }
+    .field input[type="text"], .field input[type="password"] { min-width: 0; width: 100%; }
+    .field { flex: 1 1 140px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <span class="title">%%SERVICE_TITLE%% &mdash; Log</span>
+  <nav class="tabs">
+    <button type="button" class="tab active" data-tab="search">Tra cứu log</button>
+    <button type="button" class="tab" data-tab="manage">Quản lý &amp; xoá log</button>
+  </nav>
+</header>
+<main>
+  <!-- ======================= TRA CỨU ======================= -->
+  <section id="tab-search">
+    <div class="panel">
+      <div class="filters">
+        <div class="field">
+          <label for="tag">Loại log</label>
+          <select id="tag"></select>
+        </div>
+        <div class="field">
+          <label for="fromDate">Từ ngày</label>
+          <input type="date" id="fromDate" />
+        </div>
+        <div class="field">
+          <label for="toDate">Đến ngày</label>
+          <input type="date" id="toDate" />
+        </div>
+        <div class="field">
+          <label for="keyword">Từ khoá (tuỳ chọn)</label>
+          <input type="text" id="keyword" placeholder="RequestId, Url, nội dung bất kỳ..." />
+        </div>
+        <div class="field">
+          <label for="statusFilter">Kết quả</label>
+          <select id="statusFilter">
+            <option value="all">Tất cả</option>
+            <option value="problem">Có lỗi / cảnh báo</option>
+            <option value="error">Chỉ lỗi</option>
+            <option value="ok">Thành công</option>
+          </select>
+        </div>
+        <div class="field">
+          <button id="searchBtn" type="button">Tìm kiếm</button>
+        </div>
+      </div>
+      <div id="status" class="status-line"></div>
+    </div>
+
+    <div id="results-meta"></div>
+    <div id="results"></div>
+    <div id="pagination"></div>
+    <div id="empty" hidden>Không tìm thấy dòng log nào phù hợp.</div>
+  </section>
+
+  <!-- ======================= QUẢN LÝ ======================= -->
+  <section id="tab-manage" hidden>
+    <div class="panel" id="adminKeyPanel" hidden>
+      <h2>Mã quản trị log</h2>
+      <p class="hint-text">Máy chủ có cấu hình LogSettings:AdminKey - cần nhập đúng mã mới xoá log / đổi cấu hình được.</p>
+      <div class="filters">
+        <div class="field">
+          <label for="adminKey">Mã quản trị</label>
+          <input type="password" id="adminKey" autocomplete="off" />
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Dung lượng log hiện có</h2>
+      <div class="cards" id="statCards"></div>
+      <div class="table-wrap"><table class="grid" id="tagTable"></table></div>
+      <div style="margin-top:10px"><button type="button" class="secondary small" id="refreshStatsBtn">Làm mới</button></div>
+      <div id="statsStatus" class="status-line"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Tự động xoá log</h2>
+      <p class="hint-text">Dịch vụ tự dọn định kỳ: chỉ giữ log của N ngày gần nhất (tính cả hôm nay), cũ hơn sẽ bị xoá. Nhập 0 để tắt tự xoá.</p>
+      <div class="filters">
+        <div class="field">
+          <label for="retentionDays">Giữ log (ngày)</label>
+          <input type="number" id="retentionDays" min="0" max="3650" step="1" />
+        </div>
+        <div class="field">
+          <label for="cleanupHours">Chu kỳ dọn (giờ)</label>
+          <input type="number" id="cleanupHours" min="1" max="168" step="1" />
+        </div>
+        <div class="field">
+          <label class="check"><input type="checkbox" id="applyNow" /> Dọn ngay sau khi lưu</label>
+        </div>
+        <div class="field">
+          <button type="button" id="saveSettingsBtn">Lưu cấu hình</button>
+        </div>
+      </div>
+      <div id="settingsInfo" class="status-line"></div>
+      <div id="settingsStatus" class="status-line"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Xoá log theo yêu cầu</h2>
+      <div class="filters">
+        <div class="field">
+          <label for="delTag">Loại log</label>
+          <select id="delTag"></select>
+        </div>
+      </div>
+      <div class="radio-group">
+        <label><input type="radio" name="delMode" value="range" checked /> Xoá trong khoảng ngày
+          <input type="date" id="delFrom" /> &ndash; <input type="date" id="delTo" /></label>
+        <label><input type="radio" name="delMode" value="keep" /> Chỉ giữ lại
+          <input type="number" id="delKeepDays" min="1" value="7" /> ngày gần nhất, xoá phần cũ hơn</label>
+        <label><input type="radio" name="delMode" value="all" /> Xoá toàn bộ log của loại đã chọn</label>
+      </div>
+      <button type="button" class="danger" id="deleteBtn">Xoá log</button>
+      <div id="deleteStatus" class="result-box status-line"></div>
+    </div>
+  </section>
+</main>
+
+<div id="modal-overlay">
+  <div id="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div id="modal-header">
+      <div id="modal-title"></div>
+      <div id="modal-actions">
+        <button type="button" class="secondary small" id="copyJsonBtn">Sao chép JSON</button>
+        <button type="button" class="secondary small" id="toggleRawBtn">JSON gốc</button>
+        <button type="button" id="modal-close" aria-label="Đóng">&times;</button>
+      </div>
+    </div>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<script>
+const API = '/%%LOG_ROUTE%%';
+const ALL_TAGS = '*';
+const PAGE_SIZE = 20;
+const FETCH_LIMIT = 2000; // tối đa backend hỗ trợ / lần tìm kiếm
+const STATUS_TEXT = { ok: 'Thành công', error: 'Lỗi', warn: 'Cảnh báo', info: 'Ghi nhận', unknown: 'Log cũ', skipped: 'Bỏ qua' };
+
+const $ = id => document.getElementById(id);
+
+let lastEntries = [];
+let filteredEntries = [];
+let lastKeyword = '';
+let lastTag = '';
+let currentPage = 1;
+let currentDetail = null;
+let showRaw = false;
+let adminKeyRequired = false;
+
+// ---------------------------------------------------------------- tiện ích
+function todayStr(offsetDays) {
+  const d = new Date();
+  if (offsetDays) d.setDate(d.getDate() + offsetDays);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Bôi vàng từ khoá trên text THÔ rồi mới escape từng đoạn - không bôi nhầm vào giữa "&amp;"...
+function hl(text, kw) {
+  text = String(text);
+  if (!kw) return esc(text);
+  const re = new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+  let out = '', last = 0, m;
+  while ((m = re.exec(text)) !== null) {
+    out += esc(text.slice(last, m.index)) + '<mark>' + esc(m[0]) + '</mark>';
+    last = m.index + m[0].length;
+  }
+  return out + esc(text.slice(last));
+}
+
+function fmtMs(ms) {
+  if (typeof ms !== 'number') return '';
+  if (ms < 1000) return ms + ' ms';
+  if (ms < 60000) return (ms / 1000).toFixed(2) + ' s';
+  return Math.floor(ms / 60000) + ' phút ' + Math.round((ms % 60000) / 1000) + ' s';
+}
+
+function fmtBytes(n) {
+  if (!n) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let i = 0;
+  while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
+  return (i === 0 ? n : n.toFixed(n < 10 ? 2 : 1)) + ' ' + units[i];
+}
+
+function setStatus(el, msg, kind) {
+  el.textContent = msg || '';
+  el.className = 'status-line' + (kind ? ' ' + kind : '');
+}
+
+function badge(status) {
+  return `<span class="badge st-${status}">${esc(STATUS_TEXT[status] || status)}</span>`;
+}
+
+function storageGet(key) { try { return sessionStorage.getItem(key) || ''; } catch (e) { return ''; } }
+function storageSet(key, v) { try { sessionStorage.setItem(key, v); } catch (e) { /* trình duyệt chặn storage */ } }
+
+async function api(path, options) {
+  const opts = Object.assign({ headers: {} }, options || {});
+  const key = $('adminKey').value;
+  if (key) opts.headers['X-Log-Admin-Key'] = key;
+  const resp = await fetch(API + path, opts);
+  const text = await resp.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch (e) { data = text; }
+  if (!resp.ok) {
+    const msg = typeof data === 'string' ? data : (data && (data.title || data.data)) || ('HTTP ' + resp.status);
+    throw new Error(msg);
+  }
+  return data;
+}
+
+// ---------------------------------------------------------------- hiển thị JSON
+// Pretty JSON có tô màu key/chuỗi/số; placeholder "<đã ẩn>", "<chuỗi base64, length=...>" tô xám.
+function jsonHtml(value, kw) {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') {
+    const masked = /^<.*>$/.test(value);
+    return `<pre class="code${masked ? ' j-mask' : ''}">${hl(value, kw)}</pre>`;
+  }
+  const pretty = JSON.stringify(value, null, 2);
+  const re = /("(?:\\.|[^"\\])*")(\s*:)?|\b(true|false|null)\b|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g;
+  let out = '', last = 0, m;
+  while ((m = re.exec(pretty)) !== null) {
+    out += hl(pretty.slice(last, m.index), kw);
+    if (m[1] && m[2]) out += '<span class="j-key">' + hl(m[1], kw) + '</span>' + hl(m[2], kw);
+    else if (m[1]) out += `<span class="${/^"<.*>"$/.test(m[1]) ? 'j-mask' : 'j-str'}">` + hl(m[1], kw) + '</span>';
+    else if (m[3]) out += '<span class="j-lit">' + hl(m[3], kw) + '</span>';
+    else out += '<span class="j-num">' + hl(m[4], kw) + '</span>';
+    last = m.index + m[0].length;
+  }
+  out += hl(pretty.slice(last), kw);
+  return '<pre class="code">' + out + '</pre>';
+}
+
+function hasValue(v) {
+  return v !== undefined && v !== null && v !== '';
+}
+
+// ---------------------------------------------------------------- phân tích 1 dòng log
+// Log mới (từ ApiLogger) là đúng 1 JSON object {Url, Method, Request, Response, Error, Steps,
+// Calls, DurationMs...} trên 1 dòng. Nhận diện bằng cách thử parse rồi kiểm tra có field quen thuộc
+// nào không - khác với log kiểu cũ "Key=value" (trước khi đổi sang log có cấu trúc).
+function tryParseApiLogEntry(raw) {
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch (e) { return null; }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const knownFields = ['Url', 'Method', 'Request', 'Response', 'Error', 'Calls', 'Steps', 'RequestId'];
+  return knownFields.some(f => f in parsed) ? parsed : null;
+}
+
+function analyze(entry) {
+  if (entry._a) return entry._a;
+  const obj = tryParseApiLogEntry(entry.message);
+  let status;
+  if (!obj) {
+    status = 'unknown';
+  } else if (obj.Error) {
+    status = 'error';
+  } else if ((obj.Steps || []).some(s => s.Status === 'Error') || (obj.Calls || []).some(c => c.Error)) {
+    status = 'warn';
+  } else if (!hasValue(obj.Response) && !(obj.Steps || []).length && !(obj.Calls || []).length) {
+    status = 'info'; // vd. Api_Input: chỉ ghi nhận đầu vào lúc request tới
+  } else {
+    status = 'ok';
+  }
+  entry._a = { obj, status };
+  return entry._a;
+}
+
+function firstProblem(obj) {
+  if (obj.Error) return String(obj.Error).split('\n')[0];
+  const step = (obj.Steps || []).find(s => s.Status === 'Error');
+  if (step) return `Bước ${step.Order} "${step.Name}": ${step.Error || 'lỗi'}`;
+  const call = (obj.Calls || []).find(c => c.Error);
+  if (call) return `${call.Name || 'Lệnh gọi'}: ${String(call.Error).split('\n')[0]}`;
+  return '';
+}
+
+// ---------------------------------------------------------------- log kiểu cũ (Key=value)
+// Tìm 1 đoạn {...} hoặc [...] cân bằng ngoặc bắt đầu tại vị trí start (bỏ qua ngoặc nằm trong
+// chuỗi "..."), thử JSON.parse - dùng để tách phần JSON nhúng trong message.
+function tryExtractJson(raw, start) {
+  const open = raw[start];
+  const close = open === '{' ? '}' : ']';
+  let depth = 0, inString = false, stringChar = '';
+  for (let j = start; j < raw.length; j++) {
+    const c = raw[j];
+    if (inString) {
+      if (c === '\\') { j++; continue; }
+      if (c === stringChar) inString = false;
+      continue;
+    }
+    if (c === '"' || c === "'") { inString = true; stringChar = c; continue; }
+    if (c === open) depth++;
+    else if (c === close) {
+      depth--;
+      if (depth === 0) {
+        try { return { value: JSON.parse(raw.substring(start, j + 1)), endIndex: j + 1 }; }
+        catch (e) { return null; }
+      }
+    }
+  }
+  return null;
+}
+
+// Tách message log (dạng "Key1=value1, Key2={json}, Key3: value3...") thành danh sách field có
+// tên, theo đúng thứ tự xuất hiện. Không khớp mẫu nào thì trả về đúng 1 field chứa nguyên văn.
+function parseFields(raw) {
+  const fields = [];
+  const n = raw.length;
+  const headRe = /^([A-Za-z][A-Za-z0-9_]*)\s*(?::|=)\s*/;
+  let i = 0;
+  while (i < n) {
+    const headMatch = raw.slice(i).match(headRe);
+    if (!headMatch) { fields.push({ name: null, text: raw.slice(i) }); break; }
+    const name = headMatch[1];
+    const valueStart = i + headMatch[0].length;
+    if (raw[valueStart] === '{' || raw[valueStart] === '[') {
+      const m = tryExtractJson(raw, valueStart);
+      if (m) {
+        fields.push({ name, json: m.value });
+        i = m.endIndex;
+        if (raw.slice(i, i + 2) === ', ') i += 2;
+        continue;
+      }
+    }
+    let j = valueStart;
+    const nextHeadRe = /^\s+[A-Za-z][A-Za-z0-9_]*\s*(?::|=)/;
+    while (j < n) {
+      if (raw[j] === ',' && nextHeadRe.test(raw.slice(j + 1))) break;
+      j++;
+    }
+    fields.push({ name, text: raw.slice(valueStart, j) });
+    i = j;
+    if (raw.slice(i, i + 2) === ', ') i += 2;
+  }
+  return fields;
+}
+
+function bucketOf(name) {
+  if (!name) return 'other';
+  const n = name.toLowerCase();
+  if (n === 'input' || n === 'request') return 'request';
+  if (n === 'output' || n === 'response' || n === 'code' || n === 'message' || n === 'error') return 'response';
+  return 'other';
+}
+
+function renderLegacy(raw, kw) {
+  const buckets = { request: [], response: [], other: [] };
+  for (const f of parseFields(raw)) buckets[bucketOf(f.name)].push(f);
+  const sec = (title, cls, list) => !list.length ? '' :
+    `<div class="section ${cls}"><div class="section-title">${esc(title)}</div>` +
+    list.map(f => `<div class="field-row">${f.name ? `<div class="field-label">${esc(f.name)}</div>` : ''}` +
+      (f.json !== undefined ? jsonHtml(f.json, kw) : `<div class="field-text">${hl(f.text, kw)}</div>`) + '</div>').join('') +
+    '</div>';
+  return (sec('Đầu vào (Request)', 'section-request', buckets.request) +
+    sec('Đầu ra (Response)', 'section-response', buckets.response) +
+    sec('Thông tin khác', 'section-other', buckets.other)) || '<div class="field-text">(trống)</div>';
+}
+
+// ---------------------------------------------------------------- chi tiết log có cấu trúc
+function renderCall(call, kw) {
+  const parts = [call.Name || 'Lệnh gọi'];
+  const methodUrl = [call.Method, call.Url].filter(Boolean).join(' ');
+  if (methodUrl) parts.push(methodUrl);
+  if (typeof call.DurationMs === 'number') parts.push(fmtMs(call.DurationMs));
+  if (typeof call.OffsetMs === 'number') parts.push('bắt đầu +' + fmtMs(call.OffsetMs));
+
+  let html = `<div class="call-card${call.Error ? ' has-error' : ''}">`;
+  html += `<div class="call-title">${hl(parts.join(' — '), kw)}</div>`;
+  if (hasValue(call.Request)) html += '<div class="field-label">Đầu vào (Request)</div>' + jsonHtml(call.Request, kw);
+  if (hasValue(call.Response)) html += '<div class="field-label">Đầu ra (Response)</div>' + jsonHtml(call.Response, kw);
+  if (call.Error) html += `<div class="field-label err">Lỗi</div><pre class="code err">${hl(call.Error, kw)}</pre>`;
+  return html + '</div>';
+}
+
+function stepStatus(s) {
+  return s.Status === 'Error' ? 'error' : s.Status === 'Skipped' ? 'skipped' : s.Status === 'OK' ? 'ok' : 'unknown';
+}
+
+function renderSteps(obj, kw) {
+  const steps = obj.Steps || [];
+  if (!steps.length) return '';
+  const calls = obj.Calls || [];
+  const total = Math.max(1, obj.DurationMs || 0, ...steps.map(s => (s.OffsetMs || 0) + (s.DurationMs || 0)));
+
+  let html = `<div class="section section-steps"><div class="section-title">Các bước xử lý (${steps.length}) — bấm vào từng bước để xem đầu vào/đầu ra</div>`;
+  html += '<div class="steps-legend"><span>#</span><span>Bước</span><span class="num">Bắt đầu</span><span class="num">Thời gian</span><span class="bar-col">Dòng thời gian (tổng ' + esc(fmtMs(total)) + ')</span></div>';
+  html += '<div>';
+  for (const s of steps) {
+    const st = stepStatus(s);
+    const left = ((s.OffsetMs || 0) / total) * 100;
+    const width = Math.max(((s.DurationMs || 0) / total) * 100, 0.4);
+    const stepCalls = calls.filter(c => c.StepOrder === s.Order);
+    const open = st === 'error' || (kw && JSON.stringify(s).toLowerCase().includes(kw.toLowerCase()));
+
+    html += `<div class="step st-${st}${open ? ' open' : ''}">`;
+    html += '<div class="step-head" title="Bấm để mở/đóng chi tiết">' +
+      `<span class="no">${s.Order}</span>` +
+      `<span class="name">${hl(s.Name || '', kw)} ${st !== 'ok' ? badge(st) : ''}` +
+      (stepCalls.length ? ` <span class="sub">· ${stepCalls.length} lệnh gọi</span>` : '') + '</span>' +
+      `<span class="num">+${esc(fmtMs(s.OffsetMs || 0))}</span>` +
+      `<span class="num dur">${esc(fmtMs(s.DurationMs || 0))}</span>` +
+      `<span class="bar-track"><span class="bar" style="left:${left.toFixed(2)}%;width:${Math.min(width, 100 - left).toFixed(2)}%"></span></span>` +
+      '</div>';
+
+    html += '<div class="step-body">';
+    if (hasValue(s.Input)) html += '<div class="field-label">Đầu vào</div>' + jsonHtml(s.Input, kw);
+    if (hasValue(s.Output)) html += `<div class="field-label">${st === 'skipped' ? 'Lý do bỏ qua' : 'Đầu ra'}</div>` + jsonHtml(s.Output, kw);
+    if (s.Error) html += `<div class="field-label err">Lỗi</div><pre class="code err">${hl(s.Error, kw)}</pre>`;
+    for (const c of stepCalls) html += renderCall(c, kw);
+    if (!hasValue(s.Input) && !hasValue(s.Output) && !s.Error && !stepCalls.length)
+      html += '<div class="field-text">(không có chi tiết)</div>';
+    html += '</div></div>';
+  }
+  return html + '</div></div>';
+}
+
+function infoItem(label, value, kw) {
+  if (!hasValue(value)) return '';
+  return `<div><div class="k">${esc(label)}</div><div class="v">${hl(value, kw)}</div></div>`;
+}
+
+function renderStructured(obj, entry, kw) {
+  let html = '<div class="info-grid">' +
+    infoItem('Loại log', obj.Source ? `${entry.tag} (từ ${obj.Source})` : entry.tag, kw) +
+    infoItem('RequestId', obj.RequestId, kw) +
+    infoItem('API', [obj.Method, obj.Url].filter(Boolean).join(' '), kw) +
+    infoItem('Client IP', obj.ClientIp, kw) +
+    infoItem('Bắt đầu', obj.StartTime, kw) +
+    infoItem('Hoàn thành', obj.EndTime, kw) +
+    infoItem('Tổng thời gian', typeof obj.DurationMs === 'number' && (obj.DurationMs > 0 || (obj.Steps || []).length) ? fmtMs(obj.DurationMs) : '', kw) +
+    infoItem('Chờ trong hàng đợi', typeof obj.QueueWaitMs === 'number' ? fmtMs(obj.QueueWaitMs) : '', kw) +
+    infoItem('Lần thử', obj.Attempt ? obj.Attempt + (obj.MaxAttempt ? '/' + obj.MaxAttempt : '') : '', kw) +
+    '</div>';
+
+  if (obj.Error) {
+    html += `<div class="section section-error"><div class="section-title">Lỗi</div><div class="section-body"><pre class="code err">${hl(obj.Error, kw)}</pre></div></div>`;
+  }
+
+  html += renderSteps(obj, kw);
+
+  if (hasValue(obj.Request)) {
+    html += `<div class="section section-request"><div class="section-title">Đầu vào (Request)</div><div class="section-body">${jsonHtml(obj.Request, kw)}</div></div>`;
+  }
+  if (hasValue(obj.Response)) {
+    html += `<div class="section section-response"><div class="section-title">Đầu ra (Response)</div><div class="section-body">${jsonHtml(obj.Response, kw)}</div></div>`;
+  }
+
+  // Lệnh gọi không thuộc bước nào (hoặc log ghi trước khi có Steps) - liệt kê riêng.
+  const stepOrders = new Set((obj.Steps || []).map(s => s.Order));
+  const looseCalls = (obj.Calls || []).filter(c => !stepOrders.has(c.StepOrder));
+  if (looseCalls.length) {
+    html += `<div class="section section-calls"><div class="section-title">Lệnh gọi ra API/dịch vụ khác (${looseCalls.length})</div>` +
+      '<div class="section-body">' + looseCalls.map(c => renderCall(c, kw)).join('') + '</div></div>';
+  }
+  return html;
+}
+
+function renderDetail() {
+  const entry = currentDetail;
+  if (!entry) return;
+  const { obj, status } = analyze(entry);
+  const ts = new Date(entry.timestamp).toLocaleString('vi-VN');
+
+  $('modal-title').innerHTML = badge(status) + ` <span>${esc(ts)}</span>` +
+    (obj ? ` <span class="url">${hl([obj.Method, obj.Url].filter(Boolean).join(' '), lastKeyword)}</span>` : '');
+  $('toggleRawBtn').textContent = showRaw ? 'Xem dạng chi tiết' : 'JSON gốc';
+
+  let body;
+  if (showRaw) {
+    body = obj ? jsonHtml(obj, lastKeyword) : `<pre class="code">${hl(entry.message, lastKeyword)}</pre>`;
+  } else {
+    body = obj ? renderStructured(obj, entry, lastKeyword) : renderLegacy(entry.message, lastKeyword);
+  }
+  $('modal-content').innerHTML = body;
+}
+
+function openDetail(entry) {
+  currentDetail = entry;
+  showRaw = false;
+  renderDetail();
+  $('modal-overlay').classList.add('open');
+  $('modal-content').scrollTop = 0;
+}
+
+function closeModal() {
+  $('modal-overlay').classList.remove('open');
+  currentDetail = null;
+}
+
+// ---------------------------------------------------------------- danh sách
+function matchesStatusFilter(entry) {
+  const f = $('statusFilter').value;
+  const st = analyze(entry).status;
+  if (f === 'problem') return st === 'error' || st === 'warn';
+  if (f === 'error') return st === 'error';
+  if (f === 'ok') return st === 'ok' || st === 'info';
+  return true;
+}
+
+function renderRow(entry) {
+  const { obj, status } = analyze(entry);
+  const kw = lastKeyword;
+  const div = document.createElement('div');
+  div.className = 'entry st-' + status;
+  div.title = 'Nhấp đúp để xem chi tiết';
+
+  const ts = new Date(entry.timestamp).toLocaleString('vi-VN');
+  let line1 = `<span class="ts">${esc(ts)}</span>`;
+  if (lastTag === ALL_TAGS || (obj && obj.Source)) line1 += `<span class="badge tag">${esc(obj && obj.Source ? obj.Source : entry.tag)}</span>`;
+  line1 += badge(status);
+
+  let line2 = '', line2Cls = '';
+  if (obj) {
+    const methodUrl = [obj.Method, obj.Url].filter(Boolean).join(' ');
+    if (methodUrl) line1 += `<span class="url">${hl(methodUrl, kw)}</span>`;
+    const meta = [];
+    if (typeof obj.DurationMs === 'number' && obj.DurationMs > 0) meta.push(fmtMs(obj.DurationMs));
+    if ((obj.Steps || []).length) meta.push(obj.Steps.length + ' bước');
+    if ((obj.Calls || []).length) meta.push(obj.Calls.length + ' lệnh gọi');
+    if (obj.Attempt) meta.push('lần ' + obj.Attempt + (obj.MaxAttempt ? '/' + obj.MaxAttempt : ''));
+    if (obj.RequestId) meta.push('#' + obj.RequestId);
+    if (meta.length) line1 += `<span class="meta">${hl(meta.join(' · '), kw)}</span>`;
+
+    const problem = firstProblem(obj);
+    if (problem) { line2 = problem; line2Cls = ' err'; }
+    else if (hasValue(obj.Request)) line2 = typeof obj.Request === 'string' ? obj.Request : JSON.stringify(obj.Request);
+  } else {
+    line2 = entry.message;
+  }
+
+  div.innerHTML = `<div class="line1">${line1}</div>` +
+    '<button type="button" class="secondary small">Chi tiết</button>' +
+    (line2 ? `<div class="line2${line2Cls}">${hl(line2.slice(0, 400), kw)}</div>` : '');
+  div.addEventListener('dblclick', () => openDetail(entry));
+  div.querySelector('button').addEventListener('click', e => { e.stopPropagation(); openDetail(entry); });
+  return div;
+}
+
+function applyFilterAndRender() {
+  filteredEntries = lastEntries.filter(matchesStatusFilter);
+  currentPage = 1;
+  $('empty').hidden = filteredEntries.length > 0;
+  renderPage();
+}
+
+function renderPage() {
+  const resultsEl = $('results');
+  resultsEl.innerHTML = '';
+
+  const totalPages = Math.max(1, Math.ceil(filteredEntries.length / PAGE_SIZE));
+  currentPage = Math.min(Math.max(currentPage, 1), totalPages);
+  const startIdx = (currentPage - 1) * PAGE_SIZE;
+  for (const e of filteredEntries.slice(startIdx, startIdx + PAGE_SIZE)) resultsEl.appendChild(renderRow(e));
+  renderPaginationControls(totalPages);
+}
+
+function renderPaginationControls(totalPages) {
+  const paginationEl = $('pagination');
+  paginationEl.innerHTML = '';
+  if (totalPages <= 1) return;
+
+  const prev = document.createElement('button');
+  prev.type = 'button';
+  prev.textContent = '← Trước';
+  prev.disabled = currentPage <= 1;
+  prev.onclick = () => { currentPage--; renderPage(); window.scrollTo(0, 0); };
+
+  const info = document.createElement('span');
+  info.className = 'page-info';
+  info.textContent = `Trang ${currentPage}/${totalPages} (${filteredEntries.length} dòng, mới nhất trước)`;
+
+  const next = document.createElement('button');
+  next.type = 'button';
+  next.textContent = 'Sau →';
+  next.disabled = currentPage >= totalPages;
+  next.onclick = () => { currentPage++; renderPage(); window.scrollTo(0, 0); };
+
+  paginationEl.append(prev, info, next);
+}
+
+async function search() {
+  const tag = $('tag').value;
+  const fromDate = $('fromDate').value;
+  const toDate = $('toDate').value;
+  const keyword = $('keyword').value.trim();
+  const statusEl = $('status');
+
+  if (!tag) { setStatus(statusEl, 'Chưa chọn loại log.', 'error'); return; }
+  if (!fromDate) { setStatus(statusEl, 'Chưa chọn từ ngày.', 'error'); return; }
+
+  const params = new URLSearchParams({ tag, fromDate, toDate: toDate || fromDate, limit: String(FETCH_LIMIT) });
+  if (keyword) params.set('keyword', keyword);
+
+  $('searchBtn').disabled = true;
+  setStatus(statusEl, 'Đang tìm kiếm...');
+  $('results').innerHTML = '';
+  $('pagination').innerHTML = '';
+  $('results-meta').textContent = '';
+  $('empty').hidden = true;
+
+  try {
+    const data = await api('/Search?' + params.toString());
+    setStatus(statusEl, '');
+
+    lastEntries = data.entries; // backend đã sắp xếp mới nhất trước
+    lastKeyword = keyword;
+    lastTag = tag;
+
+    const counts = { error: 0, warn: 0 };
+    for (const e of lastEntries) { const st = analyze(e).status; if (st in counts) counts[st]++; }
+    let meta = `Tìm thấy ${data.total} dòng`;
+    if (counts.error || counts.warn) meta += ` (${counts.error} lỗi, ${counts.warn} cảnh báo)`;
+    if (data.truncated) meta += ' — đã cắt bớt, thu hẹp khoảng ngày hoặc thêm từ khoá để xem đủ';
+    if (data.skippedDays && data.skippedDays.length) {
+      meta += ` — bỏ qua tạm thời ${data.skippedDays.length} file do đang được ghi (${data.skippedDays.join(', ')}), thử lại sau`;
+    }
+    $('results-meta').textContent = meta;
+    applyFilterAndRender();
+  } catch (err) {
+    setStatus(statusEl, 'Lỗi tìm kiếm: ' + err.message, 'error');
+  } finally {
+    $('searchBtn').disabled = false;
+  }
+}
+
+// ---------------------------------------------------------------- danh sách tag
+async function loadTags() {
+  const select = $('tag');
+  const delSelect = $('delTag');
+  const previous = select.value;
+  const previousDel = delSelect.value;
+  try {
+    const tags = await api('/Tags');
+    select.innerHTML = '';
+    delSelect.innerHTML = '';
+    select.appendChild(new Option('(Tất cả loại log, trừ Tong_Hop_Loi)', ALL_TAGS));
+    delSelect.appendChild(new Option('(Tất cả loại log)', ALL_TAGS));
+    for (const t of tags) {
+      select.appendChild(new Option(t, t));
+      delSelect.appendChild(new Option(t, t));
+    }
+    if (previous && tags.includes(previous)) select.value = previous;
+    else if (tags.includes('%%DEFAULT_TAG%%')) select.value = '%%DEFAULT_TAG%%'; // thường là thứ cần tra nhất
+    if (previousDel && (previousDel === ALL_TAGS || tags.includes(previousDel))) delSelect.value = previousDel;
+  } catch (err) {
+    select.innerHTML = '<option value="">(lỗi tải danh sách log)</option>';
+    setStatus($('status'), 'Không tải được danh sách loại log: ' + err.message, 'error');
+  }
+}
+
+// ---------------------------------------------------------------- quản lý log
+function renderSettingsInfo(settings) {
+  $('retentionDays').value = settings.retentionDays;
+  $('cleanupHours').value = settings.cleanupIntervalHours;
+  let info = settings.retentionDays > 0
+    ? `Đang áp dụng: giữ ${settings.retentionDays} ngày gần nhất, dọn mỗi ${settings.cleanupIntervalHours} giờ`
+    : 'Đang áp dụng: KHÔNG tự xoá log';
+  info += ` — nguồn cấu hình: ${settings.source}`;
+  if (settings.updatedAt) info += `, cập nhật ${settings.updatedAt}${settings.updatedBy ? ' từ ' + settings.updatedBy : ''}`;
+  $('settingsInfo').textContent = info;
+}
+
+async function loadStats() {
+  const statusEl = $('statsStatus');
+  setStatus(statusEl, 'Đang tải...');
+  try {
+    const data = await api('/Stats');
+    const s = data.stats;
+    adminKeyRequired = data.adminKeyRequired;
+    $('adminKeyPanel').hidden = !adminKeyRequired;
+
+    $('statCards').innerHTML = [
+      ['Tổng dung lượng', fmtBytes(s.totalBytes)],
+      ['Số file log', s.fileCount],
+      ['Số ngày có log', s.dayCount],
+      ['Ngày cũ nhất', s.oldestDay || '—'],
+      ['Ngày mới nhất', s.newestDay || '—']
+    ].map(([k, v]) => `<div class="card"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`).join('');
+
+    const max = Math.max(1, ...s.tags.map(t => t.bytes));
+    $('tagTable').innerHTML = '<tr><th>Loại log</th><th class="num">Số file</th><th class="num">Dung lượng</th><th style="width:30%"></th></tr>' +
+      (s.tags.length ? s.tags.map(t =>
+        `<tr><td>${esc(t.tag)}</td><td class="num">${t.files}</td><td class="num">${esc(fmtBytes(t.bytes))}</td>` +
+        `<td><div class="size-bar" style="width:${(t.bytes / max * 100).toFixed(1)}%"></div></td></tr>`).join('')
+        : '<tr><td colspan="4" style="color:var(--muted)">Chưa có file log nào.</td></tr>');
+
+    renderSettingsInfo(data.settings);
+    setStatus(statusEl, '');
+  } catch (err) {
+    setStatus(statusEl, 'Không tải được thống kê: ' + err.message, 'error');
+  }
+}
+
+async function saveSettings() {
+  const statusEl = $('settingsStatus');
+  const retentionDays = parseInt($('retentionDays').value, 10);
+  const cleanupIntervalHours = parseInt($('cleanupHours').value, 10);
+  const applyNow = $('applyNow').checked;
+
+  if (!(retentionDays >= 0)) { setStatus(statusEl, 'Số ngày giữ log phải >= 0.', 'error'); return; }
+  if (!(cleanupIntervalHours >= 1)) { setStatus(statusEl, 'Chu kỳ dọn phải >= 1 giờ.', 'error'); return; }
+  if (applyNow && retentionDays > 0 &&
+      !confirm(`Lưu và XOÁ NGAY mọi log cũ hơn ${retentionDays} ngày gần nhất?\nThao tác này không hoàn tác được.`)) return;
+
+  $('saveSettingsBtn').disabled = true;
+  setStatus(statusEl, 'Đang lưu...');
+  try {
+    const params = new URLSearchParams({ retentionDays, cleanupIntervalHours, applyNow });
+    const data = await api('/Settings?' + params.toString(), { method: 'POST' });
+    renderSettingsInfo(data.settings);
+    let msg = 'Đã lưu cấu hình.';
+    if (data.cleanup) msg += ` Đã dọn ${data.cleanup.deletedFiles} file (${fmtBytes(data.cleanup.deletedBytes)}).` +
+      (data.cleanup.failedFiles.length ? ` Không xoá được ${data.cleanup.failedFiles.length} file: ${data.cleanup.failedFiles.join('; ')}` : '');
+    setStatus(statusEl, msg, 'ok');
+    if (data.cleanup) { loadStats(); loadTags(); }
+  } catch (err) {
+    setStatus(statusEl, 'Lưu thất bại: ' + err.message, 'error');
+  } finally {
+    $('saveSettingsBtn').disabled = false;
+  }
+}
+
+async function deleteLogs() {
+  const statusEl = $('deleteStatus');
+  const tag = $('delTag').value || ALL_TAGS;
+  const mode = document.querySelector('input[name="delMode"]:checked').value;
+  const tagText = tag === ALL_TAGS ? 'TẤT CẢ loại log' : `loại log "${tag}"`;
+  const params = new URLSearchParams({ tag });
+  let what;
+
+  if (mode === 'range') {
+    const from = $('delFrom').value, to = $('delTo').value || from;
+    if (!from) { setStatus(statusEl, 'Chọn từ ngày.', 'error'); return; }
+    if (to < from) { setStatus(statusEl, 'Đến ngày phải >= từ ngày.', 'error'); return; }
+    params.set('fromDate', from);
+    params.set('toDate', to);
+    what = `${tagText} từ ${from} đến ${to}`;
+  } else if (mode === 'keep') {
+    const keep = parseInt($('delKeepDays').value, 10);
+    if (!(keep >= 1)) { setStatus(statusEl, 'Số ngày giữ lại phải >= 1.', 'error'); return; }
+    params.set('keepDays', keep);
+    what = `${tagText} cũ hơn ${keep} ngày gần nhất (trước ngày ${todayStr(-(keep - 1))})`;
+  } else {
+    params.set('all', 'true');
+    what = `TOÀN BỘ ${tagText}`;
+  }
+
+  if (!confirm(`Xoá ${what}?\nThao tác này không hoàn tác được.`)) return;
+
+  $('deleteBtn').disabled = true;
+  setStatus(statusEl, 'Đang xoá...');
+  try {
+    const r = await api('/Delete?' + params.toString(), { method: 'POST' });
+    let msg = `Đã xoá ${r.deletedFiles} file (${fmtBytes(r.deletedBytes)}).`;
+    if (r.failedFiles.length) msg += ` Không xoá được ${r.failedFiles.length} file: ${r.failedFiles.join('; ')}`;
+    setStatus(statusEl, msg, r.failedFiles.length ? 'error' : 'ok');
+    loadStats();
+    loadTags();
+  } catch (err) {
+    setStatus(statusEl, 'Xoá thất bại: ' + err.message, 'error');
+  } finally {
+    $('deleteBtn').disabled = false;
+  }
+}
+
+// ---------------------------------------------------------------- khởi tạo
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  $('tab-search').hidden = name !== 'search';
+  $('tab-manage').hidden = name !== 'manage';
+  if (name === 'manage') loadStats();
+}
+
+(function init() {
+  $('fromDate').value = todayStr();
+  $('toDate').value = todayStr();
+  $('delFrom').value = todayStr(-30);
+  $('delTo').value = todayStr(-1);
+  $('adminKey').value = storageGet('logAdminKey');
+
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+  $('searchBtn').addEventListener('click', search);
+  $('keyword').addEventListener('keydown', e => { if (e.key === 'Enter') search(); });
+  $('statusFilter').addEventListener('change', () => { if (lastEntries.length) applyFilterAndRender(); });
+  $('refreshStatsBtn').addEventListener('click', loadStats);
+  $('saveSettingsBtn').addEventListener('click', saveSettings);
+  $('deleteBtn').addEventListener('click', deleteLogs);
+  $('adminKey').addEventListener('change', () => storageSet('logAdminKey', $('adminKey').value));
+
+  $('modal-overlay').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+  $('modal-close').addEventListener('click', closeModal);
+  $('toggleRawBtn').addEventListener('click', () => { showRaw = !showRaw; renderDetail(); });
+  $('copyJsonBtn').addEventListener('click', async () => {
+    if (!currentDetail) return;
+    const { obj } = analyze(currentDetail);
+    const text = obj ? JSON.stringify(obj, null, 2) : currentDetail.message;
+    try {
+      await navigator.clipboard.writeText(text);
+      $('copyJsonBtn').textContent = 'Đã sao chép';
+    } catch (e) {
+      $('copyJsonBtn').textContent = 'Không sao chép được';
+    }
+    setTimeout(() => { $('copyJsonBtn').textContent = 'Sao chép JSON'; }, 1500);
+  });
+  $('modal-content').addEventListener('click', e => {
+    const head = e.target.closest('.step-head');
+    if (head) head.parentElement.classList.toggle('open');
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+  loadTags();
+})();
+</script>
+</body>
+</html>
